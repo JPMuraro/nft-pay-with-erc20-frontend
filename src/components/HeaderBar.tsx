@@ -1,3 +1,6 @@
+// Componente React que exibe a barra superior do app: nome do projeto, chainId e aviso
+// de rede incorreta (Hardhat 31337), saldo do token ERC-20 da carteira conectada
+// (lendo decimals/symbol/balanceOf via wagmi) e o botão de conexão do RainbowKit.
 import { useMemo } from "react";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { formatUnits } from "viem";

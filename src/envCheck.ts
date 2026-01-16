@@ -1,4 +1,6 @@
-// src/envCheck.ts
+// Script de verificação de ambiente do frontend: lê `VITE_WALLETCONNECT_PROJECT_ID` do Vite,
+// mascara o valor para exibição segura no console, valida presença e faz um check simples
+// de formato (hex-like), emitindo logs de erro/diagnóstico para facilitar troubleshooting.
 const projectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID as string | undefined;
 
 function mask(id: string) {

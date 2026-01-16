@@ -1,3 +1,6 @@
+// Ponto de entrada do React: aplica estilos globais, cria o root e renderiza o App dentro de
+// provedores de infraestrutura (Wagmi para Web3/EVM, React Query para cache/queries e
+// RainbowKit para UI de conexão de carteira), usando a configuração `wagmiConfig`.
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";

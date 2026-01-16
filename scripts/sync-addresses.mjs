@@ -1,3 +1,10 @@
+// Script Node.js que lê o arquivo de deploy
+// `deployments/localhost.json` do repositório de contratos
+// (assumido como vizinho do frontend), extrai os endereços do 
+// ERC-20 e ERC-721 (aceitando múltiplos formatos de chave), 
+// e gera/atualiza `src/contracts/addresses.ts` no frontend 
+// com `CHAIN_ID`, endereços tipados e versões encurtadas 
+// para uso na aplicação.
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
@@ -11,8 +18,6 @@ function short(addr) {
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
 }
 
-// Este script assume que os 2 repos estão lado a lado:
-// ../nft-pay-with-erc20-contracts/deployments/localhost.json
 const frontendRoot = process.cwd();
 const contractsDeployPath = path.resolve(
   frontendRoot,
@@ -39,11 +44,6 @@ try {
   fail(`Falha ao parsear JSON do deploy: ${String(e)}`);
 }
 
-/**
- * Aceitar múltiplos formatos.
- * Seu formato atual (confirmado pelo terminal):
- * { chainId, deployer, tokenAddress, nftAddress, price }
- */
 const token =
   json.MuraroToken ??
   json.muraroToken ??

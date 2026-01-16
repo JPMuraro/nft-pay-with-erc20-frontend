@@ -1,3 +1,6 @@
+/* Folha de estilos global da aplicação: define tipografia e tema escuro, layout base (app/container),
+barra de header fixa, grid responsivo, componentes de UI (cards, formulários, inputs, botões),
+linhas chave-valor, estados visuais (muted/warn/error/success) e área de status/rodapé. */
 :root {
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.4;

@@ -1,3 +1,8 @@
+/**
+ * Card de administração do ERC-20 que lê owner/symbol/decimals do token e permite ao owner
+ * executar mintAndTransfer para um destinatário, exibindo status e erros sem mascarar dados
+ * ainda não carregados com valores falsos.
+ */
 import { useMemo, useState } from "react";
 import { formatUnits, isAddress, parseUnits, type Address } from "viem";
 import {
@@ -24,15 +29,17 @@ export function MintAndTransferCard() {
   const [amount, setAmount] = useState<string>("100");
   const [uiError, setUiError] = useState<string | null>(null);
 
-  const { data: tokenOwnerData } = useReadContract({
+  const {
+    data: tokenOwnerData,
+    isLoading: isTokenOwnerLoading,
+    isError: isTokenOwnerError,
+  } = useReadContract({
     address: tokenAddress as Address,
     abi: ERC20_ABI,
     functionName: "owner",
     query: { enabled: Boolean(tokenAddress) },
   });
-
-  const tokenOwner = (tokenOwnerData ??
-    "0x0000000000000000000000000000000000000000") as Address;
+  const tokenOwner = tokenOwnerData as Address | undefined;
 
   const { data: decimalsData } = useReadContract({
     address: tokenAddress as Address,
@@ -40,7 +47,6 @@ export function MintAndTransferCard() {
     functionName: "decimals",
     query: { enabled: Boolean(tokenAddress) },
   });
-
   const tokenDecimals = Number(decimalsData ?? 18);
 
   const { data: symbolData } = useReadContract({
@@ -49,7 +55,6 @@ export function MintAndTransferCard() {
     functionName: "symbol",
     query: { enabled: Boolean(tokenAddress) },
   });
-
   const tokenSymbol = (symbolData ?? "TOKEN") as string;
 
   const {
@@ -72,7 +77,7 @@ export function MintAndTransferCard() {
   const busy = isSigning || isMining;
 
   const isOwner = useMemo(() => {
-    if (!address) return false;
+    if (!address || !tokenOwner) return false;
     return address.toLowerCase() === tokenOwner.toLowerCase();
   }, [address, tokenOwner]);
 
@@ -93,6 +98,9 @@ export function MintAndTransferCard() {
     if (!isConnected || !address) return setUiError("Conecte a carteira.");
     if (wrongNetwork) return setUiError("Troque para a rede Hardhat (chainId 31337).");
     if (!tokenAddress) return setUiError("Endereço do token não encontrado para esta rede.");
+    if (isTokenOwnerLoading) return setUiError("Carregando owner do token… aguarde.");
+    if (isTokenOwnerError) return setUiError("Falha ao ler owner do token.");
+    if (!tokenOwner) return setUiError("Owner do token indisponível. Recarregue.");
     if (!isOwner) return setUiError("Sua carteira não é o owner do ERC-20 (ação bloqueada pelo contrato).");
 
     const toTrim = to.trim();
@@ -130,7 +138,9 @@ export function MintAndTransferCard() {
 
       <div className="kvRow">
         <div className="k">Owner do ERC-20</div>
-        <div className="v">{tokenOwner ? shortAddress(tokenOwner) : "-"}</div>
+        <div className="v">
+          {isTokenOwnerLoading ? "Carregando…" : tokenOwner ? shortAddress(tokenOwner) : isTokenOwnerError ? "Erro" : "-"}
+        </div>
       </div>
 
       <div className="form">

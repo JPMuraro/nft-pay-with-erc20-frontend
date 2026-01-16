@@ -1,3 +1,5 @@
+// Componente React de UI que apresenta o status de uma transação: título, hash encurtado e
+// mensagens condicionais para estados pendente, sucesso ou erro (incluindo texto de erro opcional).
 import { shortAddress } from "../utils/evm";
 
 type Props = {

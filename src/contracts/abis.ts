@@ -1,5 +1,3 @@
-// src/contracts/abis.ts
-
 export const ERC20_ABI = [
   {
     type: "function",
@@ -42,8 +40,6 @@ export const ERC20_ABI = [
     ],
     outputs: [{ name: "", type: "bool" }],
   },
-
-  // Ownable (para painel admin)
   {
     type: "function",
     name: "owner",
@@ -51,8 +47,6 @@ export const ERC20_ABI = [
     inputs: [],
     outputs: [{ name: "", type: "address" }],
   },
-
-  // Sua função custom (admin)
   {
     type: "function",
     name: "mintAndTransfer",
@@ -66,16 +60,6 @@ export const ERC20_ABI = [
 ] as const;
 
 export const ERC721_ABI = [
-  // Ownable (para painel admin)
-  {
-    type: "function",
-    name: "owner",
-    stateMutability: "view",
-    inputs: [],
-    outputs: [{ name: "", type: "address" }],
-  },
-
-  // preço público exigido
   {
     type: "function",
     name: "price",
@@ -83,32 +67,12 @@ export const ERC721_ABI = [
     inputs: [],
     outputs: [{ name: "", type: "uint256" }],
   },
-
-  // setPrice onlyOwner exigido
   {
     type: "function",
-    name: "setPrice",
-    stateMutability: "nonpayable",
-    inputs: [{ name: "newPrice", type: "uint256" }],
-    outputs: [],
-  },
-
-  // mint para usuários
-  {
-    type: "function",
-    name: "mint",
-    stateMutability: "nonpayable",
-    inputs: [],
-    outputs: [],
-  },
-
-  // ERC-721 padrão (para listar/transferir)
-  {
-    type: "function",
-    name: "balanceOf",
+    name: "owner",
     stateMutability: "view",
-    inputs: [{ name: "owner", type: "address" }],
-    outputs: [{ name: "", type: "uint256" }],
+    inputs: [],
+    outputs: [{ name: "", type: "address" }],
   },
   {
     type: "function",
@@ -119,11 +83,20 @@ export const ERC721_ABI = [
   },
   {
     type: "function",
-    name: "tokenURI",
-    stateMutability: "view",
-    inputs: [{ name: "tokenId", type: "uint256" }],
-    outputs: [{ name: "", type: "string" }],
+    name: "mint",
+    stateMutability: "nonpayable",
+    inputs: [],
+    outputs: [],
   },
+  {
+    type: "function",
+    name: "setPrice",
+    stateMutability: "nonpayable",
+    inputs: [{ name: "newPrice", type: "uint256" }],
+    outputs: [],
+  },
+
+  // ✅ ESSENCIAL para o seu TransferNftCard:
   {
     type: "function",
     name: "transferFrom",
@@ -136,7 +109,53 @@ export const ERC721_ABI = [
     outputs: [],
   },
 
-  // evento para reconstruir lista de NFTs
+  // ✅ Útil (não obrigatório) — caso você queira evoluir a UI:
+  {
+    type: "function",
+    name: "approve",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "to", type: "address" },
+      { name: "tokenId", type: "uint256" },
+    ],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "setApprovalForAll",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "operator", type: "address" },
+      { name: "approved", type: "bool" },
+    ],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "getApproved",
+    stateMutability: "view",
+    inputs: [{ name: "tokenId", type: "uint256" }],
+    outputs: [{ name: "", type: "address" }],
+  },
+  {
+    type: "function",
+    name: "isApprovedForAll",
+    stateMutability: "view",
+    inputs: [
+      { name: "owner", type: "address" },
+      { name: "operator", type: "address" },
+    ],
+    outputs: [{ name: "", type: "bool" }],
+  },
+
+  {
+    type: "function",
+    name: "tokenURI",
+    stateMutability: "view",
+    inputs: [{ name: "tokenId", type: "uint256" }],
+    outputs: [{ name: "", type: "string" }],
+  },
+
   {
     type: "event",
     name: "Transfer",

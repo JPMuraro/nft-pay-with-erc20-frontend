@@ -1,3 +1,6 @@
+/* Estilos globais padrão do template Vite/React: define tipografia, rendering e smoothing,
+cores e esquema light/dark, estilos base de links, layout centralizado do body, tipografia
+de títulos, botões com estados hover/focus e ajuste automático para tema claro via media query. */
 :root {
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;

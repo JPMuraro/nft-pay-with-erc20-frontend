@@ -1,3 +1,8 @@
+/**
+ * Card de administração do ERC-721 que lê owner do NFT e o preço atual, permite ao owner
+ * atualizar o preço via setPrice e mostra status de transação, sem exibir “0” quando
+ * dados ainda não carregaram.
+ */
 import { useEffect, useMemo, useState } from "react";
 import { formatUnits, parseUnits, type Address } from "viem";
 import {
@@ -24,15 +29,18 @@ export function SetPriceCard() {
   const [newPrice, setNewPrice] = useState<string>("10");
   const [uiError, setUiError] = useState<string | null>(null);
 
-  const { data: nftOwnerData, refetch: refetchNftOwner } = useReadContract({
+  const {
+    data: nftOwnerData,
+    refetch: refetchNftOwner,
+    isLoading: isNftOwnerLoading,
+    isError: isNftOwnerError,
+  } = useReadContract({
     address: nftAddress as Address,
     abi: ERC721_ABI,
     functionName: "owner",
     query: { enabled: Boolean(nftAddress) },
   });
-
-  const nftOwner = (nftOwnerData ??
-    "0x0000000000000000000000000000000000000000") as Address;
+  const nftOwner = nftOwnerData as Address | undefined;
 
   const { data: decimalsData } = useReadContract({
     address: tokenAddress as Address,
@@ -40,7 +48,6 @@ export function SetPriceCard() {
     functionName: "decimals",
     query: { enabled: Boolean(tokenAddress) },
   });
-
   const tokenDecimals = Number(decimalsData ?? 18);
 
   const { data: symbolData } = useReadContract({
@@ -49,24 +56,29 @@ export function SetPriceCard() {
     functionName: "symbol",
     query: { enabled: Boolean(tokenAddress) },
   });
-
   const tokenSymbol = (symbolData ?? "TOKEN") as string;
 
-  const { data: priceData, refetch: refetchPrice } = useReadContract({
+  const {
+    data: priceData,
+    refetch: refetchPrice,
+    isLoading: isPriceLoading,
+    isError: isPriceError,
+  } = useReadContract({
     address: nftAddress as Address,
     abi: ERC721_ABI,
     functionName: "price",
     query: { enabled: Boolean(nftAddress) },
   });
 
-  const currentPrice = (priceData ?? 0n) as bigint;
+  const currentPrice = priceData as bigint | undefined;
 
   const currentPriceText = useMemo(() => {
+    if (currentPrice == null) return null;
     return `${formatUnits(currentPrice, tokenDecimals)} ${tokenSymbol}`;
   }, [currentPrice, tokenDecimals, tokenSymbol]);
 
   const isOwner = useMemo(() => {
-    if (!address) return false;
+    if (!address || !nftOwner) return false;
     return address.toLowerCase() === nftOwner.toLowerCase();
   }, [address, nftOwner]);
 
@@ -106,6 +118,9 @@ export function SetPriceCard() {
     if (!isConnected || !address) return setUiError("Conecte a carteira.");
     if (wrongNetwork) return setUiError("Troque para a rede Hardhat (chainId 31337).");
     if (!nftAddress) return setUiError("Endereço do NFT não encontrado para esta rede.");
+    if (isNftOwnerLoading) return setUiError("Carregando owner do NFT… aguarde.");
+    if (isNftOwnerError) return setUiError("Falha ao ler owner do NFT.");
+    if (!nftOwner) return setUiError("Owner do NFT indisponível. Recarregue.");
     if (!isOwner) return setUiError("Sua carteira não é o owner do ERC-721 (ação bloqueada pelo contrato).");
 
     const v = newPrice.trim();
@@ -146,12 +161,16 @@ export function SetPriceCard() {
 
       <div className="kvRow">
         <div className="k">Owner do ERC-721</div>
-        <div className="v">{nftOwner ? shortAddress(nftOwner) : "-"}</div>
+        <div className="v">
+          {isNftOwnerLoading ? "Carregando…" : nftOwner ? shortAddress(nftOwner) : isNftOwnerError ? "Erro" : "-"}
+        </div>
       </div>
 
       <div className="kvRow">
         <div className="k">Preço atual</div>
-        <div className="v">{currentPriceText}</div>
+        <div className="v">
+          {wrongNetwork ? "-" : isPriceLoading && currentPrice == null ? "Carregando…" : isPriceError ? "Erro" : currentPriceText ?? "-"}
+        </div>
       </div>
 
       <div className="form">

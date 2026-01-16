@@ -1,3 +1,8 @@
+/**
+ * Card de usuário que executa o fluxo completo de compra: lê preço do NFT, saldo e allowance do ERC-20,
+ * permite aprovar exatamente o valor do preço e depois mintar o NFT pagando com o ERC-20, exibindo
+ * status de transações e estados de carregamento/erro sem usar valores “falsos” de fallback na UI.
+ */
 import { useEffect, useMemo, useState } from "react";
 import { formatUnits, type Address } from "viem";
 import {
@@ -28,13 +33,15 @@ export function ApproveMintCard() {
   const enabledWallet = Boolean(address && isConnected);
   const enabledReads = enabledToken && enabledNft && enabledWallet && !wrongNetwork;
 
-  // bloco atual (watch) para refetch automático
   const { data: blockNumber } = useBlockNumber({ watch: true });
 
   const [uiError, setUiError] = useState<string | null>(null);
 
-  // --- Leitura: decimals + symbol do token
-  const { data: decimalsData } = useReadContract({
+  const {
+    data: decimalsData,
+    isLoading: isDecimalsLoading,
+    isError: isDecimalsError,
+  } = useReadContract({
     address: tokenAddress as Address,
     abi: ERC20_ABI,
     functionName: "decimals",
@@ -42,7 +49,11 @@ export function ApproveMintCard() {
   });
   const tokenDecimals = Number(decimalsData ?? 18);
 
-  const { data: symbolData } = useReadContract({
+  const {
+    data: symbolData,
+    isLoading: isSymbolLoading,
+    isError: isSymbolError,
+  } = useReadContract({
     address: tokenAddress as Address,
     abi: ERC20_ABI,
     functionName: "symbol",
@@ -50,24 +61,25 @@ export function ApproveMintCard() {
   });
   const tokenSymbol = (symbolData ?? "TOKEN") as string;
 
-  // --- Leitura: price do NFT
   const {
     data: priceData,
     refetch: refetchPrice,
     isLoading: isPriceLoading,
+    isError: isPriceError,
   } = useReadContract({
     address: nftAddress as Address,
     abi: ERC721_ABI,
     functionName: "price",
     query: { enabled: enabledNft && !wrongNetwork },
   });
-  const price = (priceData ?? 0n) as bigint;
+  const price = priceData as bigint | undefined;
+  const hasPrice = price != null;
 
-  // --- Leitura: balanceOf do token para a wallet conectada
   const {
     data: balanceData,
     refetch: refetchBalance,
     isLoading: isBalanceLoading,
+    isError: isBalanceError,
   } = useReadContract({
     address: tokenAddress as Address,
     abi: ERC20_ABI,
@@ -75,13 +87,14 @@ export function ApproveMintCard() {
     args: [(address ?? "0x0000000000000000000000000000000000000000") as Address],
     query: { enabled: enabledReads },
   });
-  const balance = (balanceData ?? 0n) as bigint;
+  const balance = balanceData as bigint | undefined;
+  const hasBalance = balance != null;
 
-  // --- Leitura: allowance (wallet -> NFT)
   const {
     data: allowanceData,
     refetch: refetchAllowance,
     isLoading: isAllowanceLoading,
+    isError: isAllowanceError,
   } = useReadContract({
     address: tokenAddress as Address,
     abi: ERC20_ABI,
@@ -92,21 +105,32 @@ export function ApproveMintCard() {
     ],
     query: { enabled: enabledReads },
   });
-  const allowance = (allowanceData ?? 0n) as bigint;
+  const allowance = allowanceData as bigint | undefined;
+  const hasAllowance = allowance != null;
 
-  // --- Formatação
-  const priceText = useMemo(() => formatUnits(price, tokenDecimals), [price, tokenDecimals]);
-  const balanceText = useMemo(() => formatUnits(balance, tokenDecimals), [balance, tokenDecimals]);
-  const allowanceText = useMemo(
-    () => formatUnits(allowance, tokenDecimals),
-    [allowance, tokenDecimals]
-  );
+  const priceText = useMemo(() => {
+    if (!hasPrice) return null;
+    return formatUnits(price as bigint, tokenDecimals);
+  }, [hasPrice, price, tokenDecimals]);
 
-  // --- Regras de habilitação
-  const hasEnoughBalance = balance >= price && price > 0n;
-  const hasEnoughAllowance = allowance >= price && price > 0n;
+  const balanceText = useMemo(() => {
+    if (!hasBalance) return null;
+    return formatUnits(balance as bigint, tokenDecimals);
+  }, [hasBalance, balance, tokenDecimals]);
 
-  // --- Approve tx
+  const allowanceText = useMemo(() => {
+    if (!hasAllowance) return null;
+    return formatUnits(allowance as bigint, tokenDecimals);
+  }, [hasAllowance, allowance, tokenDecimals]);
+
+  const hasValidPrice = hasPrice && (price as bigint) > 0n;
+
+  const hasEnoughBalance =
+    hasValidPrice && hasBalance && (balance as bigint) >= (price as bigint);
+
+  const hasEnoughAllowance =
+    hasValidPrice && hasAllowance && (allowance as bigint) >= (price as bigint);
+
   const {
     writeContract: writeApprove,
     data: approveHash,
@@ -124,7 +148,6 @@ export function ApproveMintCard() {
     query: { enabled: Boolean(approveHash) },
   });
 
-  // --- Mint tx
   const {
     writeContract: writeMint,
     data: mintHash,
@@ -152,35 +175,34 @@ export function ApproveMintCard() {
     refetchAllowance();
   }
 
-  // Refetch em todo novo bloco (mantém tela atualizada após admin tx)
   useEffect(() => {
     if (!blockNumber) return;
-    if (!enabledToken && !enabledNft) return;
-    // refetch básico (mesmo sem wallet conectada, refetchPrice funciona)
-    if (!wrongNetwork) {
-      refetchPrice();
-      if (enabledReads) {
-        refetchBalance();
-        refetchAllowance();
-      }
+    if (wrongNetwork) return;
+    if (enabledNft) refetchPrice();
+    if (enabledReads) {
+      refetchBalance();
+      refetchAllowance();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [blockNumber]);
+  }, [
+    blockNumber,
+    wrongNetwork,
+    enabledNft,
+    enabledReads,
+    refetchPrice,
+    refetchBalance,
+    refetchAllowance,
+  ]);
 
-  // Refetch após confirmar approve
   useEffect(() => {
     if (!isApproveSuccess) return;
     refetchAllowance();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isApproveSuccess]);
+  }, [isApproveSuccess, refetchAllowance]);
 
-  // Refetch após confirmar mint
   useEffect(() => {
     if (!isMintSuccess) return;
     refetchBalance();
     refetchAllowance();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isMintSuccess]);
+  }, [isMintSuccess, refetchBalance, refetchAllowance]);
 
   function onApprove() {
     setUiError(null);
@@ -188,14 +210,14 @@ export function ApproveMintCard() {
     if (!isConnected || !address) return setUiError("Conecte a carteira.");
     if (wrongNetwork) return setUiError("Troque para a rede Hardhat (chainId 31337).");
     if (!tokenAddress || !nftAddress) return setUiError("Endereços dos contratos não encontrados.");
-    if (price <= 0n) return setUiError("Preço inválido (0). Ajuste no Admin (setPrice).");
+    if (!hasPrice) return setUiError("Carregando preço do NFT… aguarde.");
+    if ((price as bigint) <= 0n) return setUiError("Preço inválido (0). Ajuste no Admin (setPrice).");
 
-    // Approve exatamente o preço atual
     writeApprove({
       address: tokenAddress,
       abi: ERC20_ABI,
       functionName: "approve",
-      args: [nftAddress, price] as const,
+      args: [nftAddress, price as bigint] as const,
     });
   }
 
@@ -205,7 +227,8 @@ export function ApproveMintCard() {
     if (!isConnected || !address) return setUiError("Conecte a carteira.");
     if (wrongNetwork) return setUiError("Troque para a rede Hardhat (chainId 31337).");
     if (!nftAddress) return setUiError("Endereço do NFT não encontrado.");
-    if (price <= 0n) return setUiError("Preço inválido (0). Ajuste no Admin (setPrice).");
+    if (!hasPrice) return setUiError("Carregando preço do NFT… aguarde.");
+    if ((price as bigint) <= 0n) return setUiError("Preço inválido (0). Ajuste no Admin (setPrice).");
     if (!hasEnoughBalance) return setUiError("Saldo insuficiente de ERC-20 para pagar o NFT.");
     if (!hasEnoughAllowance) return setUiError("Faça o approve antes de mintar.");
 
@@ -223,11 +246,16 @@ export function ApproveMintCard() {
   const mintErrText =
     (mintWriteError?.message ?? mintReceiptError?.message ?? "").split("\n")[0] || undefined;
 
+  const tokenMetaLoading = isDecimalsLoading || isSymbolLoading;
+  const tokenMetaError = isDecimalsError || isSymbolError;
+
   return (
     <div className="card">
       <div className="cardHeader">
         <div className="cardTitle">Mint do NFT pagando com ERC-20</div>
-        <div className="cardSub">Rede: {chainId} {wrongNetwork ? "(rede incorreta)" : "(Hardhat OK)"}</div>
+        <div className="cardSub">
+          Rede: {chainId} {wrongNetwork ? "(rede incorreta)" : "(Hardhat OK)"}
+        </div>
       </div>
 
       <div className="kvRow">
@@ -247,34 +275,79 @@ export function ApproveMintCard() {
 
       <div className="kvRow">
         <div className="k">Preço</div>
-        <div className="v">{isPriceLoading ? "Carregando…" : `${priceText} ${tokenSymbol}`}</div>
+        <div className="v">
+          {wrongNetwork ? (
+            "-"
+          ) : isPriceLoading && !hasPrice ? (
+            "Carregando…"
+          ) : isPriceError ? (
+            "Erro ao ler preço"
+          ) : hasPrice ? (
+            `${priceText} ${tokenSymbol}${isPriceLoading ? " (atualizando…)" : ""}`
+          ) : (
+            "-"
+          )}
+        </div>
       </div>
 
       <div className="kvRow">
         <div className="k">Saldo MuraroToken</div>
-        <div className="v">{isBalanceLoading ? "Carregando…" : `${balanceText} ${tokenSymbol}`}</div>
+        <div className="v">
+          {wrongNetwork ? (
+            "-"
+          ) : !enabledWallet ? (
+            "-"
+          ) : isBalanceLoading && !hasBalance ? (
+            "Carregando…"
+          ) : isBalanceError ? (
+            "Erro ao ler saldo"
+          ) : hasBalance ? (
+            `${balanceText} ${tokenSymbol}${isBalanceLoading ? " (atualizando…)" : ""}`
+          ) : (
+            "-"
+          )}
+        </div>
       </div>
 
       <div className="kvRow">
         <div className="k">Allowance</div>
-        <div className="v">{isAllowanceLoading ? "Carregando…" : `${allowanceText} ${tokenSymbol}`}</div>
+        <div className="v">
+          {wrongNetwork ? (
+            "-"
+          ) : !enabledWallet ? (
+            "-"
+          ) : isAllowanceLoading && !hasAllowance ? (
+            "Carregando…"
+          ) : isAllowanceError ? (
+            "Erro ao ler allowance"
+          ) : hasAllowance ? (
+            `${allowanceText} ${tokenSymbol}${isAllowanceLoading ? " (atualizando…)" : ""}`
+          ) : (
+            "-"
+          )}
+        </div>
       </div>
 
-      {!wrongNetwork && price > 0n && enabledWallet && !hasEnoughBalance ? (
+      {!wrongNetwork && hasValidPrice && enabledWallet && hasBalance && !hasEnoughBalance ? (
         <div className="warn" style={{ marginTop: 10 }}>
           Saldo insuficiente de MuraroToken (ERC-20) para mintar (precisa do preço).
         </div>
       ) : null}
 
-      {uiError ? <div className="errorBox" style={{ marginTop: 10 }}>{uiError}</div> : null}
+      {tokenMetaError ? (
+        <div className="warn" style={{ marginTop: 10 }}>
+          Não foi possível ler metadados do token (symbol/decimals). A UI pode exibir valores genéricos.
+        </div>
+      ) : null}
+
+      {uiError ? (
+        <div className="errorBox" style={{ marginTop: 10 }}>
+          {uiError}
+        </div>
+      ) : null}
 
       <div className="row" style={{ marginTop: 12, gap: 10, flexWrap: "wrap" }}>
-        <button
-          className="btn"
-          onClick={refetchAll}
-          disabled={wrongNetwork}
-          title="Atualiza price/balance/allowance"
-        >
+        <button className="btn" onClick={refetchAll} disabled={wrongNetwork} title="Atualiza price/balance/allowance">
           Recarregar
         </button>
 
@@ -285,9 +358,11 @@ export function ApproveMintCard() {
             wrongNetwork ||
             !enabledWallet ||
             approveBusy ||
-            price <= 0n ||
+            !hasPrice ||
+            !hasValidPrice ||
             tokenAddress == null ||
-            nftAddress == null
+            nftAddress == null ||
+            tokenMetaLoading
           }
         >
           {approveBusy ? "Aprovando…" : hasEnoughAllowance ? "Approve OK" : "Aprovar ERC-20"}
@@ -300,10 +375,12 @@ export function ApproveMintCard() {
             wrongNetwork ||
             !enabledWallet ||
             mintBusy ||
-            price <= 0n ||
+            !hasPrice ||
+            !hasValidPrice ||
             !hasEnoughBalance ||
             !hasEnoughAllowance ||
-            nftAddress == null
+            nftAddress == null ||
+            tokenMetaLoading
           }
         >
           {mintBusy ? "Mintando…" : "Mintar NFT"}

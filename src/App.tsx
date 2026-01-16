@@ -1,3 +1,6 @@
+// Componente raiz do frontend: aplica estilos globais, exibe o header com conexão de carteira
+// (RainbowKit) e organiza as seções do DApp (Admin, Usuários e Tokens), compondo os painéis
+// que mintam/transferem ERC-20, definem preço do NFT, aprovam ERC-20 e realizam mint/transferência.
 import { useEffect } from "react";
 import "./App.css";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
@@ -9,7 +12,6 @@ import { TokensPanel } from "./components/TokensPanel";
 
 export default function App() {
   useEffect(() => {
-    // placeholder (mantém o React sem warning de arquivo “só importado”)
   }, []);
 
   return (

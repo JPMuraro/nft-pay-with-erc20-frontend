@@ -1,5 +1,8 @@
+/**
+ * Helper que consolida o acesso aos endereços e ABIs, retornando os contratos corretos para o chainId atual.
+ */
 import type { Address } from "viem";
-import { getAddresses, HARDHAT_CHAIN_ID } from "./addresses";
+import { getAddresses } from "./addresses";
 
 export { HARDHAT_CHAIN_ID } from "./addresses";
 export { ERC20_ABI, ERC721_ABI } from "./abis";

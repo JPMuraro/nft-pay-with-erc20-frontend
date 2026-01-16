@@ -1,3 +1,7 @@
+/**
+ * Card de transferência de ERC-721 que valida tokenId e endereço do destinatário, lê ownerOf para UX
+ * e executa transferFrom, exibindo estados de carregamento/erro sem renderizar owner “0x000…”.
+ */
 import { useEffect, useMemo, useState } from "react";
 import { isAddress, type Address } from "viem";
 import {
@@ -43,7 +47,12 @@ export function TransferNftCard({ tokenIdValue, onTokenIdChange }: Props) {
   const enabledOwnerRead =
     Boolean(nftAddress && tokenIdParsed != null && address && isConnected && !wrongNetwork);
 
-  const { data: ownerOfData, refetch: refetchOwnerOf } = useReadContract({
+  const {
+    data: ownerOfData,
+    refetch: refetchOwnerOf,
+    isLoading: isOwnerOfLoading,
+    isError: isOwnerOfError,
+  } = useReadContract({
     address: nftAddress as Address,
     abi: ERC721_ABI,
     functionName: "ownerOf",
@@ -51,10 +60,10 @@ export function TransferNftCard({ tokenIdValue, onTokenIdChange }: Props) {
     query: { enabled: enabledOwnerRead },
   });
 
-  const currentOwner = (ownerOfData ?? "0x0000000000000000000000000000000000000000") as Address;
+  const currentOwner = ownerOfData as Address | undefined;
 
   const isOwner = useMemo(() => {
-    if (!address) return false;
+    if (!address || !currentOwner) return false;
     return currentOwner.toLowerCase() === address.toLowerCase();
   }, [currentOwner, address]);
 
@@ -83,15 +92,16 @@ export function TransferNftCard({ tokenIdValue, onTokenIdChange }: Props) {
     if (!isConnected || !address) return setUiError("Conecte a carteira.");
     if (wrongNetwork) return setUiError("Troque para a rede Hardhat (chainId 31337).");
     if (!nftAddress) return setUiError("Endereço do NFT não encontrado.");
-
     if (tokenIdParsed == null) return setUiError("Informe um tokenId válido (número inteiro).");
 
     const toTrim = to.trim();
     if (!isAddress(toTrim)) return setUiError("Endereço do destinatário inválido.");
 
-    // Verificação local (ajuda UX; contrato também vai reverter se não for dono/sem approval)
-    if (!isOwner) {
-      return setUiError("Você não é o owner desse tokenId (conecte a carteira correta).");
+    if (enabledOwnerRead) {
+      if (isOwnerOfLoading) return setUiError("Carregando ownerOf… aguarde.");
+      if (isOwnerOfError) return setUiError("Falha ao consultar ownerOf.");
+      if (!currentOwner) return setUiError("Owner atual indisponível. Recarregue.");
+      if (!isOwner) return setUiError("Você não é o owner desse tokenId (conecte a carteira correta).");
     }
 
     writeContract({
@@ -102,12 +112,10 @@ export function TransferNftCard({ tokenIdValue, onTokenIdChange }: Props) {
     });
   }
 
-  // Após sucesso, atualiza leitura de ownerOf
   useEffect(() => {
     if (!isSuccess) return;
     refetchOwnerOf();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isSuccess]);
+  }, [isSuccess, refetchOwnerOf]);
 
   const errText = (writeError?.message ?? receiptError?.message ?? "").split("\n")[0] || undefined;
 
@@ -141,7 +149,9 @@ export function TransferNftCard({ tokenIdValue, onTokenIdChange }: Props) {
       {enabledOwnerRead ? (
         <div className="kvRow" style={{ marginTop: 10 }}>
           <div className="k">Owner atual</div>
-          <div className="v">{shortAddress(currentOwner)}</div>
+          <div className="v">
+            {isOwnerOfLoading ? "Carregando…" : isOwnerOfError ? "Erro" : currentOwner ? shortAddress(currentOwner) : "-"}
+          </div>
         </div>
       ) : (
         <div className="muted" style={{ marginTop: 10 }}>
@@ -149,7 +159,11 @@ export function TransferNftCard({ tokenIdValue, onTokenIdChange }: Props) {
         </div>
       )}
 
-      {uiError ? <div className="errorBox" style={{ marginTop: 10 }}>{uiError}</div> : null}
+      {uiError ? (
+        <div className="errorBox" style={{ marginTop: 10 }}>
+          {uiError}
+        </div>
+      ) : null}
 
       <button
         className="btn primary"

@@ -1,3 +1,9 @@
+// ABI (Application Binary Interface) do contrato MuraroNFT,
+// contendo as definições das funções públicas `owner()`
+// e `price()` (leitura) e `setPrice(uint256)` 
+// (atualização), para permitir que o frontend 
+// interaja com o contrato via bibliotecas 
+// EVM (ex.: viem/wagmi).
 export const muraroNftAbi = [
   {
     type: "function",

@@ -1,4 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+/**
+ * Card que lista os NFTs da carteira reconstruindo a posse via eventos Transfer do ERC-721,
+ * atualizando automaticamente com watch de bloco e permitindo selecionar tokenId para transferência.
+ */
+import { useCallback, useMemo, useState, useEffect } from "react";
 import { parseAbiItem, type Address } from "viem";
 import { useAccount, useBlockNumber, useChainId, usePublicClient } from "wagmi";
 
@@ -44,7 +48,7 @@ export function MyNftsCard({ onSelectTokenId }: Props) {
     []
   );
 
-  async function load() {
+  const load = useCallback(async () => {
     if (!enabled || !publicClient || !nftAddress || !address) {
       setState((s) => ({ ...s, loading: false }));
       return;
@@ -75,11 +79,8 @@ export function MyNftsCard({ onSelectTokenId }: Props) {
       for (const l of sorted) {
         const tid = l.args?.tokenId;
         const to = l.args?.to as Address | undefined;
-
-        // validações (resolve o erro do TypeScript e evita crash)
         if (typeof tid === "undefined") continue;
         if (!to) continue;
-
         ownerByTokenId.set(tid.toString(), to);
       }
 
@@ -102,19 +103,11 @@ export function MyNftsCard({ onSelectTokenId }: Props) {
       const msg = (e?.shortMessage || e?.message || "Falha ao buscar logs.").toString();
       setState((s) => ({ ...s, loading: false, error: msg }));
     }
-  }
+  }, [enabled, publicClient, nftAddress, address, transferEvent, blockNumber]);
 
   useEffect(() => {
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, nftAddress, address]);
-
-  useEffect(() => {
-    if (!enabled) return;
-    if (!blockNumber) return;
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [blockNumber]);
+  }, [load]);
 
   return (
     <div className="card">

@@ -1,3 +1,7 @@
+// ABI (Application Binary Interface) do contrato MuraroToken.
+// Inclui as funções `owner()` e `balanceOf(address)` para leitura e
+// `mintAndTransfer(address,uint256)` para cunhar e transferir tokens,
+// permitindo integração do frontend via libs EVM (ex.: viem/wagmi).
 export const muraroTokenAbi = [
   {
     type: "function",
