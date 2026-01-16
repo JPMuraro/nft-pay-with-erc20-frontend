@@ -26,7 +26,7 @@ if (!fs.existsSync(contractsDeployPath)) {
   fail(
     `Não encontrei o arquivo de deploy em:\n  ${contractsDeployPath}\n\n` +
       `Solução:\n` +
-      `1) Clone/coloque o repo de contratos ao lado do frontend (../nft-pay-with-erc20-contracts)\n` +
+      `1) Garanta que o repo de contratos está ao lado do frontend (../nft-pay-with-erc20-contracts)\n` +
       `2) Rode no backend: npx hardhat run scripts/deploy.ts --network localhost\n`
   );
 }
@@ -39,17 +39,38 @@ try {
   fail(`Falha ao parsear JSON do deploy: ${String(e)}`);
 }
 
-// Estrutura esperada do seu deploy.ts (ajuste se necessário):
-// { "chainId": 31337, "MuraroToken": "...", "MuraroNFT": "...", "price": "..." }
-const token = json.MuraroToken || json.muraroToken || json.token || json.erc20;
-const nft = json.MuraroNFT || json.muraroNFT || json.nft || json.erc721;
+/**
+ * Aceitar múltiplos formatos.
+ * Seu formato atual (confirmado pelo terminal):
+ * { chainId, deployer, tokenAddress, nftAddress, price }
+ */
+const token =
+  json.MuraroToken ??
+  json.muraroToken ??
+  json.token ??
+  json.erc20 ??
+  json.tokenAddress ??
+  json.token_address ??
+  json.paymentToken ??
+  json.paymentTokenAddress;
+
+const nft =
+  json.MuraroNFT ??
+  json.muraroNFT ??
+  json.nft ??
+  json.erc721 ??
+  json.nftAddress ??
+  json.nft_address;
+
 const chainId = json.chainId ?? 31337;
 
 if (!token || !nft) {
   fail(
     `Não encontrei endereços no deployments/localhost.json.\n` +
       `Campos encontrados: ${Object.keys(json).join(", ")}\n\n` +
-      `Esperado: MuraroToken e MuraroNFT (ou variações).\n`
+      `Esperado um dos formatos:\n` +
+      `- MuraroToken / MuraroNFT\n` +
+      `- tokenAddress / nftAddress\n`
   );
 }
 
