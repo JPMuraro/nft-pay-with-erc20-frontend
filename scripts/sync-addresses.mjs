@@ -1,0 +1,84 @@
+import fs from "node:fs";
+import path from "node:path";
+import process from "node:process";
+
+function fail(msg) {
+  console.error(`[sync:addresses] ERRO: ${msg}`);
+  process.exit(1);
+}
+
+function short(addr) {
+  return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
+}
+
+// Este script assume que os 2 repos estão lado a lado:
+// ../nft-pay-with-erc20-contracts/deployments/localhost.json
+const frontendRoot = process.cwd();
+const contractsDeployPath = path.resolve(
+  frontendRoot,
+  "..",
+  "nft-pay-with-erc20-contracts",
+  "deployments",
+  "localhost.json"
+);
+
+if (!fs.existsSync(contractsDeployPath)) {
+  fail(
+    `Não encontrei o arquivo de deploy em:\n  ${contractsDeployPath}\n\n` +
+      `Solução:\n` +
+      `1) Clone/coloque o repo de contratos ao lado do frontend (../nft-pay-with-erc20-contracts)\n` +
+      `2) Rode no backend: npx hardhat run scripts/deploy.ts --network localhost\n`
+  );
+}
+
+const raw = fs.readFileSync(contractsDeployPath, "utf-8");
+let json;
+try {
+  json = JSON.parse(raw);
+} catch (e) {
+  fail(`Falha ao parsear JSON do deploy: ${String(e)}`);
+}
+
+// Estrutura esperada do seu deploy.ts (ajuste se necessário):
+// { "chainId": 31337, "MuraroToken": "...", "MuraroNFT": "...", "price": "..." }
+const token = json.MuraroToken || json.muraroToken || json.token || json.erc20;
+const nft = json.MuraroNFT || json.muraroNFT || json.nft || json.erc721;
+const chainId = json.chainId ?? 31337;
+
+if (!token || !nft) {
+  fail(
+    `Não encontrei endereços no deployments/localhost.json.\n` +
+      `Campos encontrados: ${Object.keys(json).join(", ")}\n\n` +
+      `Esperado: MuraroToken e MuraroNFT (ou variações).\n`
+  );
+}
+
+const outDir = path.resolve(frontendRoot, "src", "contracts");
+const outFile = path.resolve(outDir, "addresses.ts");
+
+if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
+
+const content = `// AUTO-GERADO por scripts/sync-addresses.mjs
+// Fonte: ${path.relative(frontendRoot, contractsDeployPath)}
+// Para atualizar: npm run sync:addresses
+
+import type { Address } from "viem";
+
+export const CHAIN_ID = ${Number(chainId)} as const;
+
+export const MURARO_TOKEN_ADDRESS = "${token}" as Address;
+export const MURARO_NFT_ADDRESS = "${nft}" as Address;
+
+export const SHORT = {
+  token: "${short(token)}",
+  nft: "${short(nft)}",
+} as const;
+`;
+
+fs.writeFileSync(outFile, content, "utf-8");
+
+console.log("[sync:addresses] OK");
+console.log("  chainId:", chainId);
+console.log("  token:", token);
+console.log("  nft:  ", nft);
+console.log("  wrote:", outFile);
